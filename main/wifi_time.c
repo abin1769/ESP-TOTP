@@ -94,32 +94,64 @@ int wifi_connect_sta(void)
 
 int sync_time_via_sntp(void)
 {
-    if (strlen(CONFIG_TOTP_SNTP_SERVER) == 0) {
-        ESP_LOGE(TAG, "CONFIG_TOTP_SNTP_SERVER kosong");
-        return -1;
-    }
-
     setenv("TZ", "UTC0", 1);
     tzset();
 
-    ESP_LOGI(TAG, "SNTP init (server: %s)", CONFIG_TOTP_SNTP_SERVER);
-    esp_sntp_setoperatingmode(ESP_SNTP_OPMODE_POLL);
-    esp_sntp_setservername(0, CONFIG_TOTP_SNTP_SERVER);
-    esp_sntp_init();
+    // Try primary server first
+    if (strlen(CONFIG_TOTP_SNTP_SERVER) > 0) {
+        ESP_LOGI(TAG, "SNTP init (primary: %s, timeout: %d sec)", CONFIG_TOTP_SNTP_SERVER, CONFIG_TOTP_SNTP_TIMEOUT_SEC);
+        esp_sntp_setoperatingmode(ESP_SNTP_OPMODE_POLL);
+        esp_sntp_setservername(0, CONFIG_TOTP_SNTP_SERVER);
+        esp_sntp_init();
 
-    // Wait until time is set (year >= 2020)
-    for (int i = 0; i < 30; ++i) {
-        time_t now = 0;
-        struct tm timeinfo = {0};
-        time(&now);
-        localtime_r(&now, &timeinfo);
-        if (timeinfo.tm_year >= (2020 - 1900)) {
-            ESP_LOGI(TAG, "Time synced: %ld", (long)now);
-            return 0;
+        // Calculate retry count based on timeout config
+        int max_retries = CONFIG_TOTP_SNTP_TIMEOUT_SEC * 2;  // 500ms per retry
+        for (int i = 0; i < max_retries; ++i) {
+            time_t now = 0;
+            struct tm timeinfo = {0};
+            time(&now);
+            localtime_r(&now, &timeinfo);
+            
+            if (timeinfo.tm_year >= (2020 - 1900)) {
+                ESP_LOGI(TAG, "Time synced from primary server: %ld", (long)now);
+                return 0;
+            }
+            
+            if (i % 20 == 0 && i > 0) {  // Log every 10 seconds
+                ESP_LOGD(TAG, "SNTP waiting... (%d/%d sec)", i / 2, CONFIG_TOTP_SNTP_TIMEOUT_SEC);
+            }
+            vTaskDelay(pdMS_TO_TICKS(500));
         }
-        vTaskDelay(pdMS_TO_TICKS(500));
+        ESP_LOGW(TAG, "Primary SNTP server timeout");
     }
 
-    ESP_LOGE(TAG, "SNTP sync timeout");
+    // Try backup server if configured
+    if (strlen(CONFIG_TOTP_SNTP_SERVER_BACKUP) > 0) {
+        ESP_LOGI(TAG, "Trying backup server: %s", CONFIG_TOTP_SNTP_SERVER_BACKUP);
+        esp_sntp_setoperatingmode(ESP_SNTP_OPMODE_POLL);
+        esp_sntp_setservername(0, CONFIG_TOTP_SNTP_SERVER_BACKUP);
+        esp_sntp_init();
+
+        int max_retries = CONFIG_TOTP_SNTP_TIMEOUT_SEC * 2;
+        for (int i = 0; i < max_retries; ++i) {
+            time_t now = 0;
+            struct tm timeinfo = {0};
+            time(&now);
+            localtime_r(&now, &timeinfo);
+            
+            if (timeinfo.tm_year >= (2020 - 1900)) {
+                ESP_LOGI(TAG, "Time synced from backup server: %ld", (long)now);
+                return 0;
+            }
+            
+            if (i % 20 == 0 && i > 0) {
+                ESP_LOGD(TAG, "SNTP backup waiting... (%d/%d sec)", i / 2, CONFIG_TOTP_SNTP_TIMEOUT_SEC);
+            }
+            vTaskDelay(pdMS_TO_TICKS(500));
+        }
+        ESP_LOGW(TAG, "Backup SNTP server timeout");
+    }
+
+    ESP_LOGE(TAG, "SNTP sync failed (all servers timeout)");
     return -2;
 }

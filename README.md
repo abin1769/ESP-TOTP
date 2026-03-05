@@ -24,6 +24,9 @@ idf.py menuconfig
 Masuk ke **TOTP Configuration** dan isi:
 - `WiFi SSID` → Nama jaringan WiFi
 - `WiFi Password` → Password WiFi (boleh kosong untuk open)
+- `SNTP Server (Primary)` → NTP server utama (default: `pool.ntp.org`)
+- `SNTP Server (Backup)` → NTP server fallback (default: `time.nist.gov`, kosongkan untuk disable)
+- `SNTP Sync Timeout` → Timeout SNTP (default: 60 detik, naikin jika network lambat)
 - `TOTP Secret (Base32)` → Shared secret (contoh: `JBSWY3DPEHPK3PXP`)
   - Ambil dari Google Authenticator, Microsoft Authenticator, atau service 2FA lainnya
   - Format: Base32 (A-Z, 2-7, boleh dengan spasi)
@@ -45,33 +48,82 @@ I (1234) totp_app: TOTP: 123456 (valid ~28s)
 I (5678) totp_app: TOTP: 234567 (valid ~27s)
 ```
 
-## Konfigurasi Detail
+## Build & Flash
 
-Buka konfigurasi:
+```bash
+idf.py build
+idf.py -p COMx flash monitor
+```
+Ganti `COMx` dengan port serial (contoh: `COM3` di Windows)
 
-- `idf.py menuconfig`
-- Masuk ke: **TOTP Configuration**
+## Expected Output
 
-Opsi yang tersedia:
+Setelah flash & monitor:
+```
+I (1234) wifi_time: WiFi connected
+I (5678) nvs_time: Time saved to NVS: 1772717427
+I (6000) totp_app: TOTP ready (digits=6, step=30).
+I (6100) totp_app: TOTP: 123456 (valid ~29s)
+I (36100) totp_app: TOTP: 234567 (valid ~30s)
+```
 
-- `WiFi SSID` → SSID jaringan WiFi
-- `WiFi Password` → Password WiFi
-- `SNTP Server` → Server NTP (default: `pool.ntp.org`)
-- `TOTP Secret (Base32)` → Shared secret dalam format Base32
-- `Digits` → Jumlah digit (default: 6)
-- `Time step` → Interval (default: 30 detik)
-- `T0` → RFC6238 offset (default: 0)
+Atau jika SNTP timeout (fallback NVS):
+```
+W (18931) wifi_time: Primary SNTP server timeout
+I (18931) wifi_time: Trying backup server: time.nist.gov
+I (18931) totp_app: ╔══════════════════════════════════════╗
+W (18931) totp_app: ║  SNTP SYNC FAILED (OFFLINE MODE)    ║
+W (18931) totp_app: ║  Menggunakan waktu terakhir (cache) ║
+```
 
-## Build / Flash / Monitor
+## Troubleshooting
 
-Jalankan:
+### SNTP Timeout / Tidak Bisa Sync Waktu
+**Gejala:** `E (xxx) wifi_time: SNTP sync timeout`
 
-- `idf.py build`
-- `idf.py -p COMx flash monitor`
+**Kemungkinan Penyebab:**
+1. **ISP/Firewall blok port 123 (NTP)** (very common di ISP/WiFi publik)
+   - Solusi: Ganti ke backup server atau gunakan VPN
+2. **Server primary unreachable**
+   - Solusi: Set `TOTP_SNTP_SERVER_BACKUP` ke server lain (time.nist.gov, time.google.com)
+3. **Network latency tinggi**
+   - Solusi: Naikin `TOTP_SNTP_TIMEOUT_SEC` di menuconfig (default 60s, max 300s)
+4. **WiFi tidak konek internet** (hanya connect ke router)
+   - Solusi: Cek konektivitas WiFi & DNS resolution
 
-Output contoh di monitor:
+**Debug Steps:**
+```bash
+idf.py menuconfig
+# TOTP Configuration:
+# - TOTP_SNTP_TIMEOUT_SEC = 120 (2 menit)
+# - TOTP_SNTP_SERVER_BACKUP = "time.google.com"
+idf.py build
+idf.py -p COMx flash monitor
+# Monitor log untuk SNTP progress
+```
 
-- `TOTP: 123456 (valid ~28s)`
+### TOTP Kode Salah Setelah ESP Mati
+**Gejala:** Setelah power off 5+ menit, kode TOTP tidak match authenticator
+
+**Penyebab:** Menggunakan cached time dari NVS, belum re-sync SNTP
+
+**Solusi:**
+- Pastikan WiFi tersedia saat startup (untuk SNTP sync)
+- Jika perlu offline lama, tambah RTC module (battery backup)
+- Monitor warning: `⚠️ Cache age: XXX seconds - TOTP mungkin inaccurate!`
+
+## Konfigurasi Lengkap
+
+Semua opsi di `TOTP Configuration`:
+- `WiFi SSID` → SSID jaringan
+- `WiFi Password` → Password (boleh kosong)
+- `SNTP Server (Primary)` → NTP utama (pool.ntp.org)
+- `SNTP Server (Backup)` → NTP fallback (time.nist.gov)
+- `SNTP Sync Timeout` → Timeout NTP (default 60s)
+- `TOTP Secret (Base32)` → Shared secret
+- `Digits` → Jumlah digit (default 6)
+- `Time step` → Interval (default 30s)
+- `T0` → RFC6238 offset (default 0)
 
 ## Keamanan & Best Practices
 

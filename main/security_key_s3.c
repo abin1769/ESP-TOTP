@@ -42,16 +42,30 @@ void app_main(void)
 	} else {
 		// WiFi konek, sync SNTP
 		if (sync_time_via_sntp() != 0) {
-			ESP_LOGW(TAG, "SNTP sync gagal. Coba gunakan waktu dari NVS...");
+			ESP_LOGW(TAG, "╔══════════════════════════════════════╗");
+			ESP_LOGW(TAG, "║  SNTP SYNC FAILED (OFFLINE MODE)    ║");
+			ESP_LOGW(TAG, "║  Menggunakan waktu terakhir (cache) ║");
+			ESP_LOGW(TAG, "║  TOTP mungkin salah jika cache lama ║");
+			ESP_LOGW(TAG, "╚══════════════════════════════════════╝");
+			
 			time_t saved_time = 0;
 			if (nvs_load_time(&saved_time) == 0 && saved_time > 0) {
-				ESP_LOGI(TAG, "Using time from NVS (fallback)");
+				ESP_LOGI(TAG, "Using time from NVS: %ld", (long)saved_time);
 				struct timeval tv;
 				tv.tv_sec = saved_time;
 				tv.tv_usec = 0;
 				settimeofday(&tv, NULL);
+				
+				// Calculate how old the cached time is
+				time_t now;
+				time(&now);
+				int age_sec = (int)(now - saved_time);
+				if (age_sec > 300) {
+					ESP_LOGW(TAG, "⚠️  Cache age: %d seconds - TOTP mungkin inaccurate!", age_sec);
+				}
 			} else {
-				ESP_LOGE(TAG, "SNTP gagal dan tidak ada backup waktu di NVS.");
+				ESP_LOGE(TAG, "SNTP gagal & tidak ada backup waktu di NVS. WiFi + Internet diperlukan untuk sinkronisasi awal.");
+				ESP_LOGE(TAG, "Solusi: 1) Cek SSID/Password di menuconfig 2) Cek koneksi internet 3) Cek port 123 (NTP)");
 				return;
 			}
 		} else {

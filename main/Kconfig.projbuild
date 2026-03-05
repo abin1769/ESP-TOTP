@@ -13,10 +13,25 @@ config TOTP_WIFI_PASSWORD
         Password WiFi (boleh kosong untuk open network).
 
 config TOTP_SNTP_SERVER
-    string "SNTP Server"
+    string "SNTP Server (Primary)"
     default "pool.ntp.org"
     help
-        Server NTP/SNTP untuk sinkronisasi waktu.
+        Server NTP/SNTP utama untuk sinkronisasi waktu.
+
+config TOTP_SNTP_SERVER_BACKUP
+    string "SNTP Server (Backup, opsional)"
+    default "time.nist.gov"
+    help
+        Server NTP backup kalau primary timeout.
+        Kosongkan untuk disable fallback.
+
+config TOTP_SNTP_TIMEOUT_SEC
+    int "SNTP Sync Timeout (seconds)"
+    default 60
+    range 10 300
+    help
+        Berapa lama menunggu SNTP sync sebelum timeout.
+        Naikin jika network lambat.
 
 config TOTP_SECRET_BASE32
     string "TOTP Secret (Base32)"
