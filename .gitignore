@@ -1,7 +1,30 @@
+# Build output
 build/
+*.o
+*.a
+*.elf
+*.bin
+*.map
+
+# Configuration (contains secrets & device-specific settings)
 sdkconfig
 sdkconfig.old
+sdkconfig.h
+sdkconfig.json
+
+# IDE
 .vscode/
-*.bin
-*.elf
-*.map
+.idea/
+
+# Component manager cache
+dependencies.lock
+managed_components/
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Python
+__pycache__/
+*.pyc
+*.pyo

@@ -1,0 +1,48 @@
+menu "TOTP Configuration"
+
+config TOTP_WIFI_SSID
+    string "WiFi SSID"
+    default ""
+    help
+        SSID untuk koneksi WiFi.
+
+config TOTP_WIFI_PASSWORD
+    string "WiFi Password"
+    default ""
+    help
+        Password WiFi (boleh kosong untuk open network).
+
+config TOTP_SNTP_SERVER
+    string "SNTP Server"
+    default "pool.ntp.org"
+    help
+        Server NTP/SNTP untuk sinkronisasi waktu.
+
+config TOTP_SECRET_BASE32
+    string "TOTP Secret (Base32)"
+    default ""
+    help
+        Shared secret TOTP dalam format Base32 (contoh: JBSWY3DPEHPK3PXP).
+        Huruf besar/kecil tidak berpengaruh. Spasi akan diabaikan.
+
+config TOTP_DIGITS
+    int "Digits"
+    range 6 8
+    default 6
+    help
+        Jumlah digit kode TOTP (umumnya 6).
+
+config TOTP_TIME_STEP
+    int "Time step (seconds)"
+    range 10 120
+    default 30
+    help
+        Interval TOTP dalam detik (umumnya 30).
+
+config TOTP_T0
+    int "T0 (Unix epoch offset)"
+    default 0
+    help
+        Offset awal (umumnya 0 sesuai RFC6238).
+
+endmenu
