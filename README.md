@@ -9,6 +9,104 @@ Waktu disinkronisasi lewat SNTP, lalu kode TOTP dicetak ke serial (ESP_LOGI).
 - **Startup tanpa WiFi/SNTP gagal:** Gunakan waktu terakhir dari NVS sebagai fallback
 - **Keuntungan:** TOTP tetap akurat meski ESP mati lama (asal sinkron setidaknya sekali)
 
+## 📁 Struktur Proyek
+
+### Overview Folder & File
+
+| Path | Tipe | Fungsi |
+|------|------|--------|
+| `CMakeLists.txt` | File | Konfigurasi build utama untuk ESP-IDF |
+| `README.md` | File | Dokumentasi proyek (file ini) |
+| `sdkconfig` | File | Konfigurasi hasil build sudah diaplikasikan |
+| `build/` | Folder | Output hasil kompilasi (binary, object files, cmake artifacts) |
+| `main/` | Folder | **Source code utama proyek** |
+| `managed_components/` | Folder | Library pihak ketiga (ESP TinyUSB) |
+
+### Daftar File Source Code di `main/`
+
+| File | Tipe | Fungsi |
+|------|------|--------|
+| `security_key_s3.c` | Source | **Entry point** - Main program, inisialisasi WiFi, TOTP, NVS |
+| `totp.c` / `totp.h` | Source/Header | Implementasi algoritma TOTP (RFC 6238, HMAC-SHA1) |
+| `base32.c` / `base32.h` | Source/Header | Encoding/decoding Base32 untuk shared secret |
+| `wifi_time.c` / `wifi_time.h` | Source/Header | Sinkronisasi waktu via WiFi menggunakan SNTP |
+| `nvs_time.c` / `nvs_time.h` | Source/Header | Baca/tulis waktu ke flash memory (NVS) sebagai fallback |
+| `CMakeLists.txt` | File | Build config untuk komponen main (list source files) |
+| `Kconfig.projbuild` | File | Konfigurasi menuconfig (WiFi SSID, secret, timeout, dll) |
+| `idf_component.yml` | File | Metadata komponen ESP-IDF |
+
+### Daftar Library di `managed_components/`
+
+| Folder | Fungsi |
+|--------|--------|
+| `espressif__esp_tinyusb/` | Driver USB TinyUSB dari Espressif |
+| `espressif__tinyusb/` | Library inti TinyUSB (device stack) |
+
+## 🔄 Alur Kerja Proyek
+
+```
+                    ┌──────────────────────────┐
+                    │   ESP32-S3 Startup       │
+                    │  (security_key_s3.c)     │
+                    └────────────┬─────────────┘
+                                 │
+                    ┌────────────▼────────────┐
+                    │  Inisialisasi NVS       │
+                    │  (nvs_time.c)           │
+                    └────────────┬────────────┘
+                                 │
+            ┌────────────────────▼────────────┐
+            │  Inisialisasi WiFi              │
+            │  (security_key_s3.c)            │
+            └────┬──────────────────────┬─────┘
+                 │                      │
+            WiFi │                      │ WiFi FAIL
+           READY │                      │ / TIMEOUT
+                 │                      │
+        ┌────────▼──────┐        ┌──────▼─────────┐
+        │   SNTP SYNC   │        │  Baca dari NVS │
+        │  (wifi_time.c)│        │  (nvs_time.c)  │
+        │               │        │                │
+        │ ✓ Akuisisi    │        │ ✓ Waktu cache  │
+        │   waktu dari  │        │   (last saved) │
+        │   NTP server  │        │                │
+        └───────┬───────┘        └────────┬───────┘
+                │                        │
+                └────────┬───────────────┘
+                         │
+            ┌────────────▼───────────────┐
+            │  Simpan Waktu ke NVS       │
+            │  (untuk fallback)          │
+            └────────────┬───────────────┘
+                         │
+            ┌────────────▼───────────────┐
+            │  Inisialisasi TOTP Engine  │
+            │  (totp.c)                  │
+            │  - Load shared secret      │
+            │  - Setup digit & timestep  │
+            └────────────┬───────────────┘
+                         │
+            ┌────────────▼───────────────┐
+            │  Generate & Print TOTP     │
+            │  (setiap 30 detik)         │
+            │  security_key_s3.c + totp.c│
+            │                            │
+            │  TOTP: 123456 (valid ~29s) │
+            │  TOTP: 234567 (valid ~30s) │
+            │  TOTP: 345678 (valid ~29s) │
+            │  ...                       │
+            └────────────────────────────┘
+```
+
+### Detail Alur Komponen
+
+| Komponen | Deskripsi |
+|----------|-----------|
+| **Shared Secret (Base32)** | Disimpan di menuconfig → Konfigurasi TOTP → Decode oleh base32.c |
+| **Time Sync** | WiFi SNTP → Simpan ke NVS (nvs_time.c) → Fallback jika offline |
+| **TOTP Generation** | Ambil waktu → HMAC-SHA1 dengan secret → 6 digit output |
+| **Output** | Cetak ke serial monitor setiap 30 detik |
+
 ## Quick Start
 
 ### 1. Clone & Setup
@@ -32,7 +130,7 @@ Masuk ke **TOTP Configuration** dan isi:
   - Format: Base32 (A-Z, 2-7, boleh dengan spasi)
 - (Opsional) `Digits` (default 6) dan `Time step` (default 30 detik)
 
-**⚠️ Catatan:** Nilai yang kamu isi akan tersimpan di `sdkconfig` (ignored git, jadi aman).
+**⚠️ Catatan:** Nilai yang kamu isi akan tersimpan di `sdkconfig` (pastikan ignored git).
 
 ### 3. Build & Flash
 ```bash
