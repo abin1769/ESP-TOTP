@@ -1,6 +1,6 @@
 # ESP-TOTP (ESP32-S3)
 
-Project ini menghasilkan kode TOTP (RFC6238, HMAC-SHA1) di ESP32-S3.
+Project ini menghasilkan kode TOTP (RFC6238, HMAC-SHA2256) di ESP32-S3.
 Waktu disinkronisasi lewat SNTP, lalu kode TOTP dicetak ke serial (ESP_LOGI).
 
 ## Sinkronisasi Waktu
@@ -27,7 +27,7 @@ Waktu disinkronisasi lewat SNTP, lalu kode TOTP dicetak ke serial (ESP_LOGI).
 | File | Tipe | Fungsi |
 |------|------|--------|
 | `security_key_s3.c` | Source | **Entry point** - Main program, inisialisasi WiFi, TOTP, NVS |
-| `totp.c` / `totp.h` | Source/Header | Implementasi algoritma TOTP (RFC 6238, HMAC-SHA1) |
+| `totp.c` / `totp.h` | Source/Header | Implementasi algoritma TOTP (RFC 6238, HMAC-SHA256) |
 | `base32.c` / `base32.h` | Source/Header | Encoding/decoding Base32 untuk shared secret |
 | `wifi_time.c` / `wifi_time.h` | Source/Header | Sinkronisasi waktu via WiFi menggunakan SNTP |
 | `nvs_time.c` / `nvs_time.h` | Source/Header | Baca/tulis waktu ke flash memory (NVS) sebagai fallback |
@@ -104,7 +104,7 @@ Waktu disinkronisasi lewat SNTP, lalu kode TOTP dicetak ke serial (ESP_LOGI).
 |----------|-----------|
 | **Shared Secret (Base32)** | Disimpan di menuconfig → Konfigurasi TOTP → Decode oleh base32.c |
 | **Time Sync** | WiFi SNTP → Simpan ke NVS (nvs_time.c) → Fallback jika offline |
-| **TOTP Generation** | Ambil waktu → HMAC-SHA1 dengan secret → 6 digit output |
+| **TOTP Generation** | Ambil waktu → HMAC-SHA256 dengan secret → 6 digit output |
 | **Output** | Cetak ke serial monitor setiap 30 detik |
 
 ## Quick Start
@@ -241,7 +241,7 @@ Semua opsi di `TOTP Configuration`:
 ## File yang Penting
 
 - `main/security_key_s3.c` → Main app logic
-- `main/totp.c/h` → RFC6238 HMAC-SHA1 implementation
+- `main/totp.c/h` → RFC6238 HMAC-SHA256 implementation
 - `main/base32.c/h` → Base32 decoder
 - `main/wifi_time.c/h` → WiFi & SNTP sync
 - `main/nvs_time.c/h` → NVS time backup/restore

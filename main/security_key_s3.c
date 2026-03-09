@@ -105,11 +105,11 @@ void app_main(void)
 			last_counter = counter;
 
 			char code[10];
-			int totp_rc = totp_generate_sha1(secret, secret_len, (uint64_t)now,
-											CONFIG_TOTP_DIGITS,
-											(uint32_t)CONFIG_TOTP_TIME_STEP,
-											(uint64_t)CONFIG_TOTP_T0,
-											code, sizeof(code));
+			int totp_rc = totp_generate_sha256(secret, secret_len, (uint64_t)now,
+									  CONFIG_TOTP_DIGITS,
+									  (uint32_t)CONFIG_TOTP_TIME_STEP,
+									  (uint64_t)CONFIG_TOTP_T0,
+									  code, sizeof(code));
 			if (totp_rc == 0) {
 				int remain = CONFIG_TOTP_TIME_STEP - (int)(((uint64_t)now - (uint64_t)CONFIG_TOTP_T0) % (uint32_t)CONFIG_TOTP_TIME_STEP);
 				ESP_LOGI(TAG, "TOTP: %s (valid ~%ds)", code, remain);
