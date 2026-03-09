@@ -14,13 +14,13 @@ static uint32_t pow10_u32(int digits)
     return p;
 }
 
-int totp_generate_sha256(const uint8_t *key, size_t key_len,
-                         uint64_t timestamp,
-                         int digits,
-                         uint32_t timestep,
-                         uint64_t t0,
-                         char *out_code,
-                         size_t out_code_size)
+int totp_generate_sha1(const uint8_t *key, size_t key_len,
+                       uint64_t timestamp,
+                       int digits,
+                       uint32_t timestep,
+                       uint64_t t0,
+                       char *out_code,
+                       size_t out_code_size)
 {
     if (!key || key_len == 0 || !out_code) return -1;
     if (digits < 6 || digits > 8) return -2;
@@ -36,14 +36,14 @@ int totp_generate_sha256(const uint8_t *key, size_t key_len,
         counter >>= 8;
     }
 
-    const mbedtls_md_info_t *md_info = mbedtls_md_info_from_type(MBEDTLS_MD_SHA256);
+    const mbedtls_md_info_t *md_info = mbedtls_md_info_from_type(MBEDTLS_MD_SHA1);
     if (!md_info) return -6;
 
-    uint8_t hmac[32];
+    uint8_t hmac[20];
     int rc = mbedtls_md_hmac(md_info, key, key_len, msg, sizeof(msg), hmac);
     if (rc != 0) return -7;
 
-    int offset = hmac[31] & 0x0F;
+    int offset = hmac[19] & 0x0F;
     uint32_t bin_code = ((uint32_t)(hmac[offset] & 0x7F) << 24) |
                         ((uint32_t)(hmac[offset + 1]) << 16) |
                         ((uint32_t)(hmac[offset + 2]) << 8) |
